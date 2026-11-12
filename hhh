@@ -1,1 +1,194 @@
-h
+#include <iostream>
+#include <string>
+#include <vector>
+#include <memory>
+#include <stdexcept>
+#include <iomanip>
+
+// ==========================================
+// 1. COMPOSITION COMPONENT: Dataset Class
+// ==========================================
+class Dataset {
+private:
+    std::string name;
+    int sampleCount;
+    bool isCleaned;
+
+public:
+    Dataset(std::string name, int samples, bool cleaned = true)
+        : name(std::move(name)), sampleCount(samples), isCleaned(cleaned) {
+        if (sampleCount <= 0) {
+            throw std::invalid_argument("Dataset sample count must be greater than zero!");
+        }
+    }
+
+    std::string getName() const { return name; }
+    int getSampleCount() const { return sampleCount; }
+    bool getStatus() const { return isCleaned; }
+
+    void displayInfo() const {
+        std::cout << "Dataset: " << name << " | Samples: " << sampleCount
+                  << " | Status: " << (isCleaned ? "Cleaned" : "Raw") << "\n";
+    }
+};
+
+// ==========================================
+// 2. ABSTRACTION & ENCAPSULATION: Base Class
+// ==========================================
+class AIModel {
+protected:
+    std::string modelName;
+    double learningRate;
+    double accuracy;
+
+public:
+    // Constructor with Exception Handling
+    AIModel(std::string name, double lr)
+        : modelName(std::move(name)), learningRate(lr), accuracy(0.0) {
+        if (learningRate <= 0.0 || learningRate > 1.0) {
+            throw std::out_of_range("Learning rate must be between 0.0 and 1.0!");
+        }
+    }
+
+    // Virtual Destructor for safe polymorphic deletion
+    virtual ~AIModel() = default;
+
+    // Pure Virtual Function (Polymorphism & Abstraction)
+    virtual void train(const Dataset& data, int epochs) = 0;
+
+    // Virtual function with default behavior
+    virtual void evaluate() const {
+        std::cout << "Model [" << modelName << "] Evaluation -> Accuracy: "
+                  << std::fixed << std::setprecision(2) << accuracy << "%\n";
+    }
+
+    std::string getName() const { return modelName; }
+
+    // Operator Overloading (Compare models by accuracy)
+    bool operator>(const AIModel& other) const {
+        return this->accuracy > other.accuracy;
+    }
+};
+
+// ==========================================
+// 3. INHERITANCE & POLYMORPHISM: Derived 1
+// ==========================================
+class VisionModel : public AIModel {
+private:
+    std::string resolution;
+
+public:
+    VisionModel(std::string name, double lr, std::string res)
+        : AIModel(std::move(name), lr), resolution(std::move(res)) {}
+
+    void train(const Dataset& data, int epochs) override {
+        if (epochs <= 0) {
+            throw std::invalid_argument("Epochs must be positive!");
+        }
+        std::cout << "\n[VisionModel] Training '" << modelName << "' (Resolution: " << resolution << ")\n";
+        std::cout << "Processing " << data.getSampleCount() << " images for " << epochs << " epochs...\n";
+        
+        // Simulated accuracy calculation
+        accuracy = 75.0 + (epochs * 1.5) + (learningRate * 10.0);
+        if (accuracy > 99.5) accuracy = 99.5;
+    }
+};
+
+// ==========================================
+// 4. INHERITANCE & POLYMORPHISM: Derived 2
+// ==========================================
+class NLPModel : public AIModel {
+private:
+    int vocabSize;
+
+public:
+    NLPModel(std::string name, double lr, int vocab)
+        : AIModel(std::move(name), lr), vocabSize(vocab) {}
+
+    void train(const Dataset& data, int epochs) override {
+        if (epochs <= 0) {
+            throw std::invalid_argument("Epochs must be positive!");
+        }
+        std::cout << "\n[NLPModel] Training '" << modelName << "' (Vocab Size: " << vocabSize << " tokens)\n";
+        std::cout << "Tokenizing " << data.getSampleCount() << " text records for " << epochs << " epochs...\n";
+        
+        // Simulated accuracy calculation
+        accuracy = 72.0 + (epochs * 1.8) + (learningRate * 12.0);
+        if (accuracy > 98.9) accuracy = 98.9;
+    }
+};
+
+// ==========================================
+// 5. COMPOSITION & STL: Training Pipeline
+// ==========================================
+class TrainingPipeline {
+private:
+    std::string pipelineName;
+    Dataset dataset; // Composition: Pipeline owns a Dataset
+    std::vector<std::shared_ptr<AIModel>> models; // STL + Smart Pointers
+
+public:
+    TrainingPipeline(std::string name, Dataset ds)
+        : pipelineName(std::move(name)), dataset(std::move(ds)) {}
+
+    void addModel(const std::shared_ptr<AIModel>& model) {
+        models.push_back(model);
+    }
+
+    void runAll(int epochs) {
+        std::cout << "==========================================\n";
+        std::cout << "Running Pipeline: " << pipelineName << "\n";
+        dataset.displayInfo();
+        std::cout << "==========================================\n";
+
+        for (const auto& model : models) {
+            model->train(dataset, epochs);
+            model->evaluate();
+        }
+    }
+
+    void findBestModel() const {
+        if (models.empty()) return;
+        auto best = models[0];
+        for (const auto& model : models) {
+            if (*model > *best) { // Uses overloaded '>' operator
+                best = model;
+            }
+        }
+        std::cout << "\n>>> Best Performing Model: " << best->getName() << " <<<\n";
+    }
+};
+
+// ==========================================
+// MAIN FUNCTION
+// ==========================================
+int main() {
+    try {
+        // 1. Create a Dataset
+        Dataset aiData("MultiModal_Benchmark_2026", 5000, true);
+
+        // 2. Initialize the Pipeline (Composition)
+        TrainingPipeline pipeline("AI_Department_AutoML", aiData);
+
+        // 3. Create Models dynamically (Polymorphism & Smart Pointers)
+        auto cnn = std::make_shared<VisionModel>("ResNet-Lite", 0.05, "224x224");
+        auto transformer = std::make_shared<NLPModel>("Mini-BERT", 0.03, 30522);
+
+        // 4. Add to Pipeline & Execute
+        pipeline.addModel(cnn);
+        pipeline.addModel(transformer);
+        pipeline.runAll(10);
+
+        // 5. Compare results using Operator Overloading
+        pipeline.findBestModel();
+
+        // 6. Demonstrate Exception Handling
+        std::cout << "\n--- Testing Exception Handling ---\n";
+        auto invalidModel = std::make_shared<VisionModel>("BrokenNet", -0.5, "128x128");
+
+    } catch (const std::exception& e) {
+        std::cerr << "[Caught Exception] Error: " << e.what() << "\n";
+    }
+
+    return 0;
+}
